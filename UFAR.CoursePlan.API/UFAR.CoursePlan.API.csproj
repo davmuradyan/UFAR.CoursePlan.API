@@ -21,10 +21,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Controllers\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\UFAR.CoursePlan.API.Data\UFAR.CoursePlan.API.Data.csproj" />
     <ProjectReference Include="..\UFAR.CoursePlan.API․Core\UFAR.CoursePlan.API․Core.csproj" />
   </ItemGroup>

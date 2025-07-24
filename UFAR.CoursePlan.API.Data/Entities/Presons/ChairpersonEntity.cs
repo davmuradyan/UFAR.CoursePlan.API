@@ -1,4 +1,4 @@
 ﻿namespace UFAR.CoursePlan.API.Data.Entities.Presons {
-    public class DeanEntity : AbstractPerson {
+    public class ChairpersonEntity : AbstractPerson {
     }
 }

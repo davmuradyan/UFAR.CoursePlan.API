@@ -1,4 +1,6 @@
-﻿namespace UFAR.CoursePlan.API.Data.Entities.Uni {
+﻿using UFAR.CoursePlan.API.Data.Entities.Infrastructure;
+
+namespace UFAR.CoursePlan.API.Data.Entities.Uni {
     public class SubjectEntity : MainAbstractEntity {
         public required string Name { get; set; }
         public required string UE { get; set; }

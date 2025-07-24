@@ -1,10 +1,10 @@
-﻿namespace UFAR.CoursePlan.API.Data.Entities.Uni {
-    public class BlockEntity : MainAbstractEntity {
+﻿using UFAR.CoursePlan.API.Data.Entities.Infrastructure;
+
+namespace UFAR.CoursePlan.API.Data.Entities.Uni {
+    public class BlockEntity : AbstractUni {
         public byte Number { get; set; }
         public Year Year { get; set; }
         public Semester Semester { get; set; }
-        public int FacultyId { get; set; }
-        public FacultyEntity? Faculty { get; set; }
     }
 
     public enum Year {
