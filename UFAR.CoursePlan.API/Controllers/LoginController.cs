@@ -1,14 +1,17 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using UFAR.CoursePlan.API_Core.DTOs;
+using UFAR.CoursePlan.API_Core.Services.ChairpersonSide;
 using UFAR.CoursePlan.API_Core.Services.DeanSide;
 
 
 namespace UFAR.CoursePlan.API.Controllers {
     public class LoginController : Controller {
         IDeanServices deanServices;
-        public LoginController(IDeanServices deanServices)
+        IChairpersonSide chairpersonSide;
+        public LoginController(IDeanServices deanServices, IChairpersonSide chairpersonSide)
         {
             this.deanServices = deanServices;
+            this.chairpersonSide = chairpersonSide;
         }
 
         [HttpPost("CreateDean")]
@@ -35,6 +38,14 @@ namespace UFAR.CoursePlan.API.Controllers {
             else
             {
                 return StatusCode(500, "An error occurred during login");
+            }
+        }
+        [HttpPost("CreateChairperson")]
+        public async Task<IActionResult> CreateChairperson([FromBody] ChairpersonDto chairperson) {
+            if (await chairpersonSide.CreateChairperson(chairperson)) {
+                return Ok("Chairperson created successfully");
+            } else {
+                return BadRequest("Failed to create chairperson");
             }
         }
     }

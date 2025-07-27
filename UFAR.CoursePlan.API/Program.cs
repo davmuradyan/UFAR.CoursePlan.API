@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using UFAR.CoursePlan.API.Data.DAO;
+using UFAR.CoursePlan.API_Core.Services.AdminServices;
+using UFAR.CoursePlan.API_Core.Services.ChairpersonSide;
 using UFAR.CoursePlan.API_Core.Services.DeanSide;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +17,8 @@ builder.Services.AddDbContext<MainDbContext>(options =>
 
 // Add services to the container.
 builder.Services.AddScoped<IDeanServices, DeanServices>();
+builder.Services.AddScoped<IAdminServices, AdminServices>();
+builder.Services.AddScoped<IChairpersonSide, ChairpersonSide>();
 
 var app = builder.Build();
 
