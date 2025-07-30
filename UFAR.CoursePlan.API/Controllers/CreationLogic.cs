@@ -1,12 +1,16 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using UFAR.CoursePlan.API_Core.CreatingDtos;
 using UFAR.CoursePlan.API_Core.DTOs;
 using UFAR.CoursePlan.API_Core.Services.AdminServices;
+using UFAR.CoursePlan.API_Core.Services.DeanSide;
 
 namespace UFAR.CoursePlan.API.Controllers {
     public class CreationLogic : Controller {
         IAdminServices adminServices;
-        public CreationLogic(IAdminServices adminServices) {
+        IDeanServices deanServices;
+        public CreationLogic(IAdminServices adminServices, IDeanServices deanServices) {
             this.adminServices = adminServices;
+            this.deanServices = deanServices;
         }
 
         [HttpPost("CreateUniversity")]
@@ -38,5 +42,16 @@ namespace UFAR.CoursePlan.API.Controllers {
                 return BadRequest("Failed to create chair.");
             }
         }
+        [HttpPost("CreateProfs")]
+        public async Task<IActionResult> CreateProfessors([FromBody] CreateProfsDtoReceived dto) {
+            bool result = await deanServices.CreateProfessors(dto.deanId, dto.profs);
+            if (result) {
+                return Ok("Professors saved successfully.");
+            } else {
+                return BadRequest("Failed to create professors. Or it was done partially.");
+            }
+        }
     }
+
+    public record CreateProfsDtoReceived(int deanId, List<CreateProfDto> profs);
 }

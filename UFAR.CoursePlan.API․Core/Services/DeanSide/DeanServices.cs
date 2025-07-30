@@ -5,6 +5,7 @@ using UFAR.CoursePlan.API.Data.Entities.Presons;
 using UFAR.CoursePlan.API.Data.Entities.Accounts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using UFAR.CoursePlan.API_Core.CreatingDtos;
 
 namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
     public class DeanServices : IDeanServices {
@@ -57,57 +58,64 @@ namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
             }
         }
 
-        public async Task<bool> CreateProfessor(ProfessorDto professor, int deanId) {
-            // Validation
-            if (professor.Name.IsNullOrEmpty() || professor.Surname.IsNullOrEmpty() ||
-                professor.Email.IsNullOrEmpty() || !professor.Password.IsNullOrEmpty()) {
-                return false;
-            }
-
-            // Corrected code to retrieve facultyId
-            var faculty = await context.Faculties
-                .FirstOrDefaultAsync(f => f.DeanId == deanId);
-
-            if (faculty == null) {
-                Console.WriteLine("[ERROR]\tDeanService: Faculty not found for the given Dean ID.");
-                return false;
-            }
-
-            int facultyId = faculty.Id;
-
-            var newProfessor = new ProfessorEntity() {
-                Name = professor.Name,
-                Surname = professor.Surname,
-                Email = professor.Email,
-                Phone = professor.Phone,
-                FacultyId = facultyId,
-                CreatedAt = DateTime.Now,
-                UpdatedAt = DateTime.Now,
-            };
-
+        public async Task<bool> CreateProfessors(int deanId, List<CreateProfDto> professors) {
             try {
-                await context.Professors.AddAsync(newProfessor);
-                await context.SaveChangesAsync();
+
+                int facultyId = await context.Faculties
+                    .Where(f => f.DeanId == deanId)
+                    .Select(f => f.Id)
+                    .FirstOrDefaultAsync();
+                professors = professors.Where(p => !(p.Name.IsNullOrEmpty() || p.Surname.IsNullOrEmpty()
+                                                 || p.Email.IsNullOrEmpty() || p.Phone.IsNullOrEmpty())).ToList();
+                foreach (var prof in professors) {
+                    var alreadyExists = await context.Professors
+                        .AnyAsync(p => p.Email == prof.Email && p.FacultyId == facultyId &&
+                                        p.Name == prof.Name && p.Surname == p.Surname);
+                    if (!alreadyExists) {
+                        var transaction = await context.Database.BeginTransactionAsync();
+                        var newProf = new ProfessorEntity() {
+                            Name = prof.Name,
+                            Surname = prof.Surname,
+                            Email = prof.Email,
+                            Phone = prof.Phone,
+                            FacultyId = facultyId,
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
+                        };
+                        await context.Professors.AddAsync(newProf);
+                        await context.SaveChangesAsync();
+
+                        var profAccount = new ProfessorAccountEntity() {
+                            ProfessorId = newProf.Id,
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now,
+                            Password = new PasswordHasher<ProfessorAccountEntity>()
+                                .HashPassword(null, "changeYourPassword") // Assuming prof.Password is provided
+                        };
+
+                        await context.ProfessorAccounts.AddAsync(profAccount);
+                        await context.SaveChangesAsync();
+                        transaction.Commit();
+                    }
+                }
                 return true;
-            } catch (Exception ex) {
-                Console.WriteLine("[ERROR]\tDeanService: Failed to create professor.");
-                Console.WriteLine(ex.Message);
+            } catch {
                 return false;
             }
         }
 
-        public async Task<LoginResult> TryLoginFromDean(DeanLoginDto loginData) {
+        public async Task<int> TryLoginFromDean(DeanLoginDto loginData) {
             try {
                 var dean = await context.Deans.FirstOrDefaultAsync(d => d.Email == loginData.Email);
                 if (dean == null) {
                     Console.WriteLine("[InvalidLogin]\tDeanService: Dean not found with the provided email.");
-                    return LoginResult.InvalidCredentials;
+                    return -(int)LoginResult.InvalidCredentials;
                 }
 
                 var deanAccount = await context.DeanAccounts.FirstOrDefaultAsync(da => da.DeanId == dean.Id);
                 if (deanAccount == null) {
                     Console.WriteLine("[InvalidLogin]\tDeanService: Dean account not found.");
-                    return LoginResult.InvalidCredentials;
+                    return -(int)LoginResult.InvalidCredentials;
                 }
 
                 var hasher = new PasswordHasher<DeanAccountEntity>();
@@ -115,13 +123,13 @@ namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
 
                 if (result == PasswordVerificationResult.Failed) {
                     Console.WriteLine("[InvalidLogin]\tDeanService: Invalid password.");
-                    return LoginResult.InvalidCredentials;
+                    return -(int)LoginResult.InvalidCredentials;
                 }
 
-                return LoginResult.Success;
+                return dean.Id;
             } catch (Exception ex) {
                 Console.WriteLine($"[ERROR] Error occurred while login attempt with email: {loginData.Email}");
-                return LoginResult.Error;
+                return -(int)LoginResult.Error;
             }
         }
     }

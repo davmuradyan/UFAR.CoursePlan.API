@@ -27,11 +27,11 @@ namespace UFAR.CoursePlan.API.Controllers {
         public async Task<IActionResult> TryLoginFromDean([FromBody] DeanLoginDto loginData)
         {
             var result = await deanServices.TryLoginFromDean(loginData);
-            if (result == LoginResult.Success)
+            if (result > 0)
             {
-                return Ok("Login successful");
+                return Ok($"Login successful! DeanId:{result}");
             }
-            else if (result == LoginResult.InvalidCredentials)
+            else if ((LoginResult)(-result) == LoginResult.InvalidCredentials)
             {
                 return Unauthorized("Invalid credentials");
             }
