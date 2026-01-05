@@ -132,5 +132,21 @@ namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
                 return -(int)LoginResult.Error;
             }
         }
+
+        public async Task<List<ProfessorEntity>> GetProfessors(int deanId) {
+            try {
+                int facultyId = await context.Faculties
+                    .Where(f => f.DeanId == deanId)
+                    .Select(f => f.Id)
+                    .FirstOrDefaultAsync();
+                return await context.Professors
+                    .Where(p => p.FacultyId == facultyId)
+                    .ToListAsync();
+            } catch (Exception ex) {
+                Console.WriteLine($"[ERROR] Error occurred while fetching professors for dean ID: {deanId}");
+                Console.WriteLine(ex.Message);
+                return new List<ProfessorEntity>();
+            }
+        }
     }
 }

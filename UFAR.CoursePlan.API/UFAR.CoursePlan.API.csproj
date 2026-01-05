@@ -25,4 +25,8 @@
     <ProjectReference Include="..\UFAR.CoursePlan.API․Core\UFAR.CoursePlan.API․Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="SendReceiveDtos\ReceiveDtos\" />
+  </ItemGroup>
+
 </Project>
