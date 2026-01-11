@@ -13,7 +13,14 @@ builder.Services.AddSwaggerGen();
 
 // Add DbContext with SQL Server connection
 builder.Services.AddDbContext<MainDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("MainConnectionString")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("MainConnectionString"),
+        sqlServerOptionsAction: sqlOptions =>
+        {
+            sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(30),
+                errorNumbersToAdd: null);
+        }));
 
 // Add services to the container.
 builder.Services.AddScoped<IDeanServices, DeanServices>();

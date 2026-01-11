@@ -23,41 +23,44 @@ namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
                 return false;
             }
 
-            using var transaction = await context.Database.BeginTransactionAsync();
-            try {
-                var newDean = new DeanEntity() {
-                    Name = dean.Name,
-                    Surname = dean.Surname,
-                    Email = dean.Email,
-                    CreatedAt = DateTime.Now,
-                    UpdatedAt = DateTime.Now,
-                };
+            var strategy = context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync<MainDbContext, bool>(context, async (ctx, ct) => {
+                using var transaction = await ctx.Database.BeginTransactionAsync(ct);
+                try {
+                    var newDean = new DeanEntity() {
+                        Name = dean.Name,
+                        Surname = dean.Surname,
+                        Email = dean.Email,
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now,
+                    };
 
-                await context.Deans.AddAsync(newDean);
-                await context.SaveChangesAsync();
+                    await ctx.Deans.AddAsync(newDean, ct);
+                    await ctx.SaveChangesAsync(ct);
 
-                // Hash the password before storing
-                var hasher = new PasswordHasher<DeanAccountEntity>();
-                var deanAccount = new DeanAccountEntity() {
-                    DeanId = newDean.Id,
-                    CreatedAt = DateTime.Now,
-                    UpdatedAt = DateTime.Now,
-                    Password = hasher.HashPassword(null, dean.Password)
-                };
+                    // Hash the password before storing
+                    var hasher = new PasswordHasher<DeanAccountEntity>();
+                    var deanAccount = new DeanAccountEntity() {
+                        DeanId = newDean.Id,
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now,
+                        Password = hasher.HashPassword(null, dean.Password)
+                    };
 
-                await context.DeanAccounts.AddAsync(deanAccount);
-                await context.SaveChangesAsync();
+                    await ctx.DeanAccounts.AddAsync(deanAccount, ct);
+                    await ctx.SaveChangesAsync(ct);
 
-                await transaction.CommitAsync();
-                return true;
-            } catch (Exception ex) {
-                await transaction.RollbackAsync();
+                    await transaction.CommitAsync(ct);
+                    return true;
+                } catch (Exception ex) {
+                    await transaction.RollbackAsync(ct);
 
-                Console.WriteLine("[ERROR]\tDeanService: Transaction failed!");
-                Console.WriteLine(ex.Message);
+                    Console.WriteLine("[ERROR]\tDeanService: Transaction failed!");
+                    Console.WriteLine(ex.Message);
 
-                return false;
-            }
+                    return false;
+                }
+            }, null, default);
         }
 
         public async Task<bool> CreateProfessors(int deanId, List<CreateProfDto> professors) {
@@ -74,30 +77,39 @@ namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
                         .AnyAsync(p => p.Email == prof.Email && p.FacultyId == facultyId &&
                                         p.Name == prof.Name && p.Surname == p.Surname);
                     if (!alreadyExists) {
-                        var transaction = await context.Database.BeginTransactionAsync();
-                        var newProf = new ProfessorEntity() {
-                            Name = prof.Name,
-                            Surname = prof.Surname,
-                            Email = prof.Email,
-                            Phone = prof.Phone,
-                            FacultyId = facultyId,
-                            CreatedAt = DateTime.Now,
-                            UpdatedAt = DateTime.Now
-                        };
-                        await context.Professors.AddAsync(newProf);
-                        await context.SaveChangesAsync();
+                        var strategy = context.Database.CreateExecutionStrategy();
+                        await strategy.ExecuteAsync<MainDbContext, bool>(context, async (ctx, ct) => {
+                            using var transaction = await ctx.Database.BeginTransactionAsync(ct);
+                            try {
+                                var newProf = new ProfessorEntity() {
+                                    Name = prof.Name,
+                                    Surname = prof.Surname,
+                                    Email = prof.Email,
+                                    Phone = prof.Phone,
+                                    FacultyId = facultyId,
+                                    CreatedAt = DateTime.Now,
+                                    UpdatedAt = DateTime.Now
+                                };
+                                await ctx.Professors.AddAsync(newProf, ct);
+                                await ctx.SaveChangesAsync(ct);
 
-                        var profAccount = new ProfessorAccountEntity() {
-                            ProfessorId = newProf.Id,
-                            CreatedAt = DateTime.Now,
-                            UpdatedAt = DateTime.Now,
-                            Password = new PasswordHasher<ProfessorAccountEntity>()
-                                .HashPassword(null, "changeYourPassword") // Assuming prof.Password is provided
-                        };
+                                var profAccount = new ProfessorAccountEntity() {
+                                    ProfessorId = newProf.Id,
+                                    CreatedAt = DateTime.Now,
+                                    UpdatedAt = DateTime.Now,
+                                    Password = new PasswordHasher<ProfessorAccountEntity>()
+                                        .HashPassword(null, "changeYourPassword") // Assuming prof.Password is provided
+                                };
 
-                        await context.ProfessorAccounts.AddAsync(profAccount);
-                        await context.SaveChangesAsync();
-                        transaction.Commit();
+                                await ctx.ProfessorAccounts.AddAsync(profAccount, ct);
+                                await ctx.SaveChangesAsync(ct);
+                                await transaction.CommitAsync(ct);
+                                return true;
+                            } catch {
+                                await transaction.RollbackAsync(ct);
+                                throw;
+                            }
+                        }, null, default);
                     }
                 }
                 return true;
@@ -152,32 +164,34 @@ namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
         }
 
         public async Task<bool> ApplyDataTrackerChanges(int deanId, DataTrackerDto dataTrackerDto) {
-            using var transaction = await context.Database.BeginTransactionAsync();
-            try {
-                // Get dean's faculty ID
-                int facultyId = await context.Faculties
-                    .Where(f => f.DeanId == deanId)
-                    .Select(f => f.Id)
-                    .FirstOrDefaultAsync();
+            var strategy = context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync<MainDbContext, bool>(context, async (ctx, ct) => {
+                using var transaction = await ctx.Database.BeginTransactionAsync(ct);
+                try {
+                    // Get dean's faculty ID
+                    int facultyId = await ctx.Faculties
+                        .Where(f => f.DeanId == deanId)
+                        .Select(f => f.Id)
+                        .FirstOrDefaultAsync(ct);
 
-                if (facultyId == 0) {
-                    Console.WriteLine("[ERROR]\tDeanService: Faculty not found for dean.");
-                    return false;
-                }
+                    if (facultyId == 0) {
+                        Console.WriteLine("[ERROR]\tDeanService: Faculty not found for dean.");
+                        return false;
+                    }
 
                 // 1. Handle Professor Deletes
                 if (dataTrackerDto.DeleteProfessorList != null && dataTrackerDto.DeleteProfessorList.Count > 0) {
                     var professorIds = dataTrackerDto.DeleteProfessorList;
-                    var professorsToDelete = await context.Professors
+                    var professorsToDelete = await ctx.Professors
                         .Where(p => professorIds.Contains(p.Id))
-                        .ToListAsync();
-                    context.Professors.RemoveRange(professorsToDelete);
+                        .ToListAsync(ct);
+                    ctx.Professors.RemoveRange(professorsToDelete);
                 }
 
                 // 2. Handle Professor Updates
                 if (dataTrackerDto.UpdateProfessorList != null && dataTrackerDto.UpdateProfessorList.Count > 0) {
                     foreach (var profUpdate in dataTrackerDto.UpdateProfessorList) {
-                        var professor = await context.Professors.FindAsync(profUpdate.Id);
+                        var professor = await ctx.Professors.FindAsync(new object[] { profUpdate.Id }, ct);
                         if (professor != null) {
                             if (!string.IsNullOrEmpty(profUpdate.Name))
                                 professor.Name = profUpdate.Name;
@@ -204,7 +218,7 @@ namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
                             CreatedAt = DateTime.Now,
                             UpdatedAt = DateTime.Now
                         };
-                        await context.Professors.AddAsync(newProfessor);
+                        await ctx.Professors.AddAsync(newProfessor, ct);
                     }
                 }
 
@@ -213,22 +227,22 @@ namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
                     var blockIds = dataTrackerDto.deleteBlockObjects;
                     
                     // Delete subjects in these blocks first
-                    var subjectsToDelete = await context.Subjects
+                    var subjectsToDelete = await ctx.Subjects
                         .Where(s => blockIds.Contains(s.BlockId))
-                        .ToListAsync();
-                    context.Subjects.RemoveRange(subjectsToDelete);
+                        .ToListAsync(ct);
+                    ctx.Subjects.RemoveRange(subjectsToDelete);
                     
                     // Then delete blocks
-                    var blocksToDelete = await context.Blocks
+                    var blocksToDelete = await ctx.Blocks
                         .Where(b => blockIds.Contains(b.Id))
-                        .ToListAsync();
-                    context.Blocks.RemoveRange(blocksToDelete);
+                        .ToListAsync(ct);
+                    ctx.Blocks.RemoveRange(blocksToDelete);
                 }
 
                 // 5. Handle Block Updates
                 if (dataTrackerDto.updateBlockObjects != null && dataTrackerDto.updateBlockObjects.Count > 0) {
                     foreach (var blockUpdate in dataTrackerDto.updateBlockObjects) {
-                        var block = await context.Blocks.FindAsync(blockUpdate.Id);
+                        var block = await ctx.Blocks.FindAsync(new object[] { blockUpdate.Id }, ct);
                         if (block != null) {
                             if (blockUpdate.YearSemester != null) {
                                 block.Year = (Year)blockUpdate.YearSemester.year;
@@ -239,7 +253,7 @@ namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
                             // Handle subjects in the updated block
                             if (blockUpdate.Subjects != null && blockUpdate.Subjects.Count > 0) {
                                 foreach (var subjectUpdate in blockUpdate.Subjects) {
-                                    var subject = await context.Subjects.FindAsync(subjectUpdate.Id);
+                                    var subject = await ctx.Subjects.FindAsync(new object[] { subjectUpdate.Id }, ct);
                                     if (subject != null) {
                                         if (!string.IsNullOrEmpty(subjectUpdate.Name))
                                             subject.Name = subjectUpdate.Name;
@@ -280,8 +294,8 @@ namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
                             CreatedAt = DateTime.Now,
                             UpdatedAt = DateTime.Now
                         };
-                        await context.Blocks.AddAsync(newBlock);
-                        await context.SaveChangesAsync(); // Save to get block ID
+                        await ctx.Blocks.AddAsync(newBlock, ct);
+                        await ctx.SaveChangesAsync(ct); // Save to get block ID
 
                         // Create subjects for this block
                         if (blockCreate.Subjects != null && blockCreate.Subjects.Count > 0) {
@@ -301,7 +315,7 @@ namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
                                     CreatedAt = DateTime.Now,
                                     UpdatedAt = DateTime.Now
                                 };
-                                await context.Subjects.AddAsync(newSubject);
+                                await ctx.Subjects.AddAsync(newSubject, ct);
                             }
                         }
                     }
@@ -323,10 +337,10 @@ namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
                     allLoapDeleteIds.AddRange(dataTrackerDto.deleteSoftSkillMasterObjects);
 
                 if (allLoapDeleteIds.Count > 0) {
-                    var loapsToDelete = await context.Loaps
+                    var loapsToDelete = await ctx.Loaps
                         .Where(l => allLoapDeleteIds.Contains(l.Id))
-                        .ToListAsync();
-                    context.Loaps.RemoveRange(loapsToDelete);
+                        .ToListAsync(ct);
+                    ctx.Loaps.RemoveRange(loapsToDelete);
                 }
 
                 // 8. Handle LOAP Updates
@@ -345,15 +359,16 @@ namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
                 await HandleLoapCreates(dataTrackerDto.createSkillMasterObjects, "Master", LoapType.Skill, facultyId);
                 await HandleLoapCreates(dataTrackerDto.createSoftSkillMasterObjects, "Master", LoapType.SoftSkill, facultyId);
 
-                await context.SaveChangesAsync();
-                await transaction.CommitAsync();
+                await ctx.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
                 return true;
             } catch (Exception ex) {
-                await transaction.RollbackAsync();
+                await transaction.RollbackAsync(ct);
                 Console.WriteLine("[ERROR]\tDeanService: ApplyDataTrackerChanges transaction failed!");
                 Console.WriteLine(ex.Message);
                 return false;
             }
+            }, null, default);
         }
 
         private async Task HandleLoapUpdates(List<UpdateLoapItemObject>? loapItems, string degree, LoapType loapType) {
