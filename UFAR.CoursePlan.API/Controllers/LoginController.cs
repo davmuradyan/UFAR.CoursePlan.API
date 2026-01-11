@@ -66,7 +66,7 @@ namespace UFAR.CoursePlan.API.Controllers {
             }
         }
 
-        [HttpPost("Test")]
+        [HttpGet("Test")]
         public async Task<IActionResult> Test() {
             return Ok("API is working");
         }
