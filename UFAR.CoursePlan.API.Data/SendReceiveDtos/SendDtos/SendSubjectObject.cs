@@ -2,7 +2,6 @@
 
 public record SendSubjectObject {
     public int Id { get; set; }
-    public required int Number { get; set; }
     public string? Name { get; set; }
     public string? UE { get; set; }
     public double? CM { get; set; }

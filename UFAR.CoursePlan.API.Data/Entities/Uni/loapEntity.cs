@@ -4,6 +4,7 @@ namespace UFAR.CoursePlan.API.Data.Entities.Uni {
     public class LoapEntity : AbstractUni {
         public LoapType LoapType { get; set; }
         public required string Value { get; set; }
+        public string Degree { get; set; } = string.Empty;
     }
 
     public enum LoapType {

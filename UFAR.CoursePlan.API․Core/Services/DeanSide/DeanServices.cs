@@ -6,6 +6,8 @@ using UFAR.CoursePlan.API.Data.Entities.Accounts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using UFAR.CoursePlan.API_Core.CreatingDtos;
+using UFAR.CoursePlan.API.Data.SendReceiveDtos.ReceiveDtos;
+using UFAR.CoursePlan.API.Data.Entities.Uni;
 
 namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
     public class DeanServices : IDeanServices {
@@ -146,6 +148,240 @@ namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
                 Console.WriteLine($"[ERROR] Error occurred while fetching professors for dean ID: {deanId}");
                 Console.WriteLine(ex.Message);
                 return new List<ProfessorEntity>();
+            }
+        }
+
+        public async Task<bool> ApplyDataTrackerChanges(int deanId, DataTrackerDto dataTrackerDto) {
+            using var transaction = await context.Database.BeginTransactionAsync();
+            try {
+                // Get dean's faculty ID
+                int facultyId = await context.Faculties
+                    .Where(f => f.DeanId == deanId)
+                    .Select(f => f.Id)
+                    .FirstOrDefaultAsync();
+
+                if (facultyId == 0) {
+                    Console.WriteLine("[ERROR]\tDeanService: Faculty not found for dean.");
+                    return false;
+                }
+
+                // 1. Handle Professor Deletes
+                if (dataTrackerDto.DeleteProfessorList != null && dataTrackerDto.DeleteProfessorList.Count > 0) {
+                    var professorIds = dataTrackerDto.DeleteProfessorList;
+                    var professorsToDelete = await context.Professors
+                        .Where(p => professorIds.Contains(p.Id))
+                        .ToListAsync();
+                    context.Professors.RemoveRange(professorsToDelete);
+                }
+
+                // 2. Handle Professor Updates
+                if (dataTrackerDto.UpdateProfessorList != null && dataTrackerDto.UpdateProfessorList.Count > 0) {
+                    foreach (var profUpdate in dataTrackerDto.UpdateProfessorList) {
+                        var professor = await context.Professors.FindAsync(profUpdate.Id);
+                        if (professor != null) {
+                            if (!string.IsNullOrEmpty(profUpdate.Name))
+                                professor.Name = profUpdate.Name;
+                            if (!string.IsNullOrEmpty(profUpdate.Surname))
+                                professor.Surname = profUpdate.Surname;
+                            if (!string.IsNullOrEmpty(profUpdate.Email))
+                                professor.Email = profUpdate.Email;
+                            if (!string.IsNullOrEmpty(profUpdate.PhoneNumber))
+                                professor.Phone = profUpdate.PhoneNumber;
+                            professor.UpdatedAt = DateTime.Now;
+                        }
+                    }
+                }
+
+                // 3. Handle Professor Creates
+                if (dataTrackerDto.CreateProfessorList != null && dataTrackerDto.CreateProfessorList.Count > 0) {
+                    foreach (var profCreate in dataTrackerDto.CreateProfessorList) {
+                        var newProfessor = new ProfessorEntity {
+                            Name = profCreate.Name,
+                            Surname = profCreate.Surname,
+                            Email = profCreate.Email,
+                            Phone = profCreate.PhoneNumber,
+                            FacultyId = facultyId,
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
+                        };
+                        await context.Professors.AddAsync(newProfessor);
+                    }
+                }
+
+                // 4. Handle Block Deletes (and cascade delete subjects)
+                if (dataTrackerDto.deleteBlockObjects != null && dataTrackerDto.deleteBlockObjects.Count > 0) {
+                    var blockIds = dataTrackerDto.deleteBlockObjects;
+                    
+                    // Delete subjects in these blocks first
+                    var subjectsToDelete = await context.Subjects
+                        .Where(s => blockIds.Contains(s.BlockId))
+                        .ToListAsync();
+                    context.Subjects.RemoveRange(subjectsToDelete);
+                    
+                    // Then delete blocks
+                    var blocksToDelete = await context.Blocks
+                        .Where(b => blockIds.Contains(b.Id))
+                        .ToListAsync();
+                    context.Blocks.RemoveRange(blocksToDelete);
+                }
+
+                // 5. Handle Block Updates
+                if (dataTrackerDto.updateBlockObjects != null && dataTrackerDto.updateBlockObjects.Count > 0) {
+                    foreach (var blockUpdate in dataTrackerDto.updateBlockObjects) {
+                        var block = await context.Blocks.FindAsync(blockUpdate.Id);
+                        if (block != null) {
+                            if (blockUpdate.YearSemester != null) {
+                                block.Year = (Year)blockUpdate.YearSemester.year;
+                                block.Semester = (Semester)blockUpdate.YearSemester.semester;
+                            }
+                            block.UpdatedAt = DateTime.Now;
+
+                            // Handle subjects in the updated block
+                            if (blockUpdate.Subjects != null && blockUpdate.Subjects.Count > 0) {
+                                foreach (var subjectUpdate in blockUpdate.Subjects) {
+                                    var subject = await context.Subjects.FindAsync(subjectUpdate.Id);
+                                    if (subject != null) {
+                                        if (!string.IsNullOrEmpty(subjectUpdate.Name))
+                                            subject.Name = subjectUpdate.Name;
+                                        if (!string.IsNullOrEmpty(subjectUpdate.UE))
+                                            subject.UE = subjectUpdate.UE;
+                                        if (subjectUpdate.CM.HasValue)
+                                            subject.CM = subjectUpdate.CM.Value;
+                                        if (subjectUpdate.TD.HasValue)
+                                            subject.TD = subjectUpdate.TD.Value;
+                                        if (subjectUpdate.CTD.HasValue)
+                                            subject.CTD = subjectUpdate.CTD.Value;
+                                        if (subjectUpdate.TP.HasValue)
+                                            subject.TP = subjectUpdate.TP.Value;
+                                        if (subjectUpdate.CTP.HasValue)
+                                            subject.CTP = subjectUpdate.CTP.Value;
+                                        if (subjectUpdate.TPS.HasValue)
+                                            subject.TPS = subjectUpdate.TPS.Value;
+                                        if (subjectUpdate.Project.HasValue)
+                                            subject.Project = subjectUpdate.Project.Value;
+                                        if (subjectUpdate.ECTS.HasValue)
+                                            subject.ECTS = subjectUpdate.ECTS.Value;
+                                        subject.UpdatedAt = DateTime.Now;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 6. Handle Block Creates
+                if (dataTrackerDto.createBlockObjects != null && dataTrackerDto.createBlockObjects.Count > 0) {
+                    foreach (var blockCreate in dataTrackerDto.createBlockObjects) {
+                        var newBlock = new BlockEntity {
+                            Number = 0,
+                            Year = (Year)(int)blockCreate.YearSemester.year,
+                            Semester = (Semester)(int)blockCreate.YearSemester.semester,
+                            FacultyId = facultyId,
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
+                        };
+                        await context.Blocks.AddAsync(newBlock);
+                        await context.SaveChangesAsync(); // Save to get block ID
+
+                        // Create subjects for this block
+                        if (blockCreate.Subjects != null && blockCreate.Subjects.Count > 0) {
+                            foreach (var subjectCreate in blockCreate.Subjects) {
+                                var newSubject = new SubjectEntity {
+                                    Name = subjectCreate.Name,
+                                    UE = subjectCreate.UE,
+                                    CM = subjectCreate.CM,
+                                    TD = subjectCreate.TD,
+                                    CTD = subjectCreate.CTD,
+                                    TP = subjectCreate.TP,
+                                    CTP = subjectCreate.CTP,
+                                    TPS = subjectCreate.TPS,
+                                    Project = subjectCreate.Project,
+                                    ECTS = subjectCreate.ECTS,
+                                    BlockId = newBlock.Id,
+                                    CreatedAt = DateTime.Now,
+                                    UpdatedAt = DateTime.Now
+                                };
+                                await context.Subjects.AddAsync(newSubject);
+                            }
+                        }
+                    }
+                }
+
+                // 7. Handle LOAP Deletes - collect all delete IDs
+                var allLoapDeleteIds = new List<int>();
+                if (dataTrackerDto.deleteKnowledgeLicenseObjects != null)
+                    allLoapDeleteIds.AddRange(dataTrackerDto.deleteKnowledgeLicenseObjects);
+                if (dataTrackerDto.deleteKnowledgeMasterObjects != null)
+                    allLoapDeleteIds.AddRange(dataTrackerDto.deleteKnowledgeMasterObjects);
+                if (dataTrackerDto.deleteSkillLicenseObjects != null)
+                    allLoapDeleteIds.AddRange(dataTrackerDto.deleteSkillLicenseObjects);
+                if (dataTrackerDto.deleteSkillMasterObjects != null)
+                    allLoapDeleteIds.AddRange(dataTrackerDto.deleteSkillMasterObjects);
+                if (dataTrackerDto.deleteSoftSkillLicenseObjects != null)
+                    allLoapDeleteIds.AddRange(dataTrackerDto.deleteSoftSkillLicenseObjects);
+                if (dataTrackerDto.deleteSoftSkillMasterObjects != null)
+                    allLoapDeleteIds.AddRange(dataTrackerDto.deleteSoftSkillMasterObjects);
+
+                if (allLoapDeleteIds.Count > 0) {
+                    var loapsToDelete = await context.Loaps
+                        .Where(l => allLoapDeleteIds.Contains(l.Id))
+                        .ToListAsync();
+                    context.Loaps.RemoveRange(loapsToDelete);
+                }
+
+                // 8. Handle LOAP Updates
+                await HandleLoapUpdates(dataTrackerDto.updateKnowledgeLicenseObjects, "License", LoapType.Knowledge);
+                await HandleLoapUpdates(dataTrackerDto.updateSkillLicenseObjects, "License", LoapType.Skill);
+                await HandleLoapUpdates(dataTrackerDto.updateSoftSkillLicenseObjects, "License", LoapType.SoftSkill);
+                await HandleLoapUpdates(dataTrackerDto.updateKnowledgeMasterObjects, "Master", LoapType.Knowledge);
+                await HandleLoapUpdates(dataTrackerDto.updateSkillMasterObjects, "Master", LoapType.Skill);
+                await HandleLoapUpdates(dataTrackerDto.updateSoftSkillMasterObjects, "Master", LoapType.SoftSkill);
+
+                // 9. Handle LOAP Creates
+                await HandleLoapCreates(dataTrackerDto.createKnowledgeLicenseObjects, "License", LoapType.Knowledge, facultyId);
+                await HandleLoapCreates(dataTrackerDto.createSkillLicenseObjects, "License", LoapType.Skill, facultyId);
+                await HandleLoapCreates(dataTrackerDto.createSoftSkillLicenseObjects, "License", LoapType.SoftSkill, facultyId);
+                await HandleLoapCreates(dataTrackerDto.createKnowledgeMasterObjects, "Master", LoapType.Knowledge, facultyId);
+                await HandleLoapCreates(dataTrackerDto.createSkillMasterObjects, "Master", LoapType.Skill, facultyId);
+                await HandleLoapCreates(dataTrackerDto.createSoftSkillMasterObjects, "Master", LoapType.SoftSkill, facultyId);
+
+                await context.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return true;
+            } catch (Exception ex) {
+                await transaction.RollbackAsync();
+                Console.WriteLine("[ERROR]\tDeanService: ApplyDataTrackerChanges transaction failed!");
+                Console.WriteLine(ex.Message);
+                return false;
+            }
+        }
+
+        private async Task HandleLoapUpdates(List<UpdateLoapItemObject>? loapItems, string degree, LoapType loapType) {
+            if (loapItems == null || loapItems.Count == 0) return;
+
+            foreach (var loapUpdate in loapItems) {
+                var loap = await context.Loaps.FindAsync(loapUpdate.Id);
+                if (loap != null) {
+                    if (!string.IsNullOrEmpty(loapUpdate.Value))
+                        loap.Value = loapUpdate.Value;
+                    loap.UpdatedAt = DateTime.Now;
+                }
+            }
+        }
+
+        private async Task HandleLoapCreates(List<CreateLoapItemObject>? loapItems, string degree, LoapType loapType, int facultyId) {
+            if (loapItems == null || loapItems.Count == 0) return;
+
+            foreach (var loapCreate in loapItems) {
+                var newLoap = new LoapEntity {
+                    Value = loapCreate.Value,
+                    Degree = degree,
+                    LoapType = loapType,
+                    FacultyId = facultyId,
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
+                };
+                await context.Loaps.AddAsync(newLoap);
             }
         }
     }

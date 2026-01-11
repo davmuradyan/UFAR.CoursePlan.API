@@ -2,6 +2,7 @@
 using UFAR.CoursePlan.API.Data.Entities.Presons;
 using UFAR.CoursePlan.API_Core.CreatingDtos;
 using UFAR.CoursePlan.API_Core.DTOs;
+using UFAR.CoursePlan.API.Data.SendReceiveDtos.ReceiveDtos;
 
 namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
     public interface IDeanServices {
@@ -9,16 +10,6 @@ namespace UFAR.CoursePlan.API_Core.Services.DeanSide {
         Task<bool> CreateProfessors(int deanId, List<CreateProfDto> professors);
         Task<int> TryLoginFromDean(DeanLoginDto loginData);
         Task<List<ProfessorEntity>> GetProfessors(int deanId);
-    }
-
-    public class DeanLoginDto {
-        public required string Email { get; set; }
-        public required string Password { get; set; }
-    }
-
-    public enum LoginResult {
-        Success,
-        InvalidCredentials,
-        Error
+        Task<bool> ApplyDataTrackerChanges(int deanId, DataTrackerDto dataTrackerDto);
     }
 }

@@ -11,6 +11,7 @@ namespace UFAR.CoursePlan.API.Data.Entities.Uni {
         public double CTP { get; set; }
         public double TPS { get; set; }
         public double Project { get; set; }
+        public double ECTS { get; set; }
         public int BlockId { get; set; }
         public BlockEntity? Block { get; set; }
     }

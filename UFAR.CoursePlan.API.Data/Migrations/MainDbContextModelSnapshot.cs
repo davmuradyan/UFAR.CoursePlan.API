@@ -418,6 +418,10 @@ namespace UFAR.CoursePlan.API.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Degree")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("FacultyId")
                         .HasColumnType("int");
 
@@ -460,6 +464,9 @@ namespace UFAR.CoursePlan.API.Data.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<double>("ECTS")
+                        .HasColumnType("float");
 
                     b.Property<string>("Name")
                         .IsRequired()
