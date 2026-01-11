@@ -66,6 +66,10 @@ namespace UFAR.CoursePlan.API.Controllers {
             }
         }
 
+        [HttpPost("Test")]
+        public async Task<IActionResult> Test() {
+            return Ok("API is working");
+        }
         void PrepareDataAccessObject(MainDataAccessObject obj, int fId) { 
             var loap = mainDbContext.Loaps.Where(l => l.FacultyId == fId).ToList();
             var profs = mainDbContext.Professors.Where(p => p.FacultyId == fId).ToList();
