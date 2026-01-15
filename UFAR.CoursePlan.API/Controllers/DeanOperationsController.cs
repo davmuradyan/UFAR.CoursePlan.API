@@ -4,6 +4,8 @@ using UFAR.CoursePlan.API.Data.SendReceiveDtos.ReceiveDtos;
 using Microsoft.Extensions.Logging;
 
 namespace UFAR.CoursePlan.API.Controllers;
+[ApiController]
+[Route("[controller]")]
 public class DeanOperationsController : Controller
 {
     private readonly IDeanServices _deanServices;
@@ -18,11 +20,10 @@ public class DeanOperationsController : Controller
     }
     
     [HttpPost("SaveDeanChanges")]
-    public async Task<IActionResult> SaveDeanChanges([FromBody] DataTrackerDto dataTrackerDto, [FromQuery] int deanId)
+    public async Task<IActionResult> SaveDeanChanges([FromQuery] int deanId, [FromBody] DataTrackerDto dataTrackerDto)
     {
         _logger.LogInformation("Received SaveDeanChanges request");
-        _logger.LogInformation($"{dataTrackerDto.CreateProfessorList.Count}");
-
+        return StatusCode(200, dataTrackerDto); 
         if (dataTrackerDto == null)
         {
             return BadRequest("DataTracker is required");
@@ -40,6 +41,6 @@ public class DeanOperationsController : Controller
             return Ok(new { success = true, message = "Changes applied successfully" });
         }
         
-        return StatusCode(500, new { success = false, message = "Failed to apply changes" });
+        return StatusCode(500, new { success = false, message = "Another custom message" });
     }
 }
