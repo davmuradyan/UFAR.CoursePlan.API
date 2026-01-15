@@ -15,11 +15,16 @@ namespace UFAR.CoursePlan.API.Controllers {
         IDeanServices deanServices;
         IChairpersonSide chairpersonSide;
         MainDbContext mainDbContext;
-        public LoginController(IDeanServices deanServices, IChairpersonSide chairpersonSide, MainDbContext mainDbContext)
+        ILogger _logger;
+        public LoginController(IDeanServices deanServices, 
+            IChairpersonSide chairpersonSide, 
+            MainDbContext mainDbContext,
+            ILogger logger)
         {
             this.deanServices = deanServices;
             this.chairpersonSide = chairpersonSide;
             this.mainDbContext = mainDbContext;
+            _logger = logger;
         }
 
         [HttpPost("CreateDean")]
@@ -68,6 +73,7 @@ namespace UFAR.CoursePlan.API.Controllers {
 
         [HttpGet("Test")]
         public async Task<IActionResult> Test() {
+            _logger.LogInformation("I am working!");
             return Ok("API is working");
         }
         void PrepareDataAccessObject(MainDataAccessObject obj, int fId) { 
